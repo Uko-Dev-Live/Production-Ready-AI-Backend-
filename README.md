@@ -27,9 +27,9 @@ FastAPI + Pydantic for APIs and validation
 7. MCP Servers (interpreted here as leveraging multiprocessing where appropriate, e.g., for AI model serving or task handling to extend AI apps)
 
 
-=========================================================================================================================================================================================================
+================
 Framed Question
-==========================================================================================================================================================================================================
+================
 
 Build a Production-Ready AI Backends Project
 
@@ -57,8 +57,8 @@ Provide me with th following:
 
 Add the following to the Project:
 
-a. Scripts to import fake_users.csv automatically
-b. Helper Makefile for docker commands
-c. Monitoring Celery tasks
-d. Extended AI integration samples
-e. Provide a comprehensive description of the Project for README.md file created 
+1. Scripts to import fake_users.csv automatically
+2. Helper Makefile for docker commands
+3. Monitoring Celery tasks
+4. Extended AI integration samples
+5. Provide a comprehensive description of the Project for README.md file created 
