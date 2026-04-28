@@ -1,0 +1,109 @@
+
+# ─────────────────────────────────────────────────────────────
+#  AI Backend — Docker Compose
+#
+#  Services:
+#    db        → PostgreSQL database
+#    redis     → Message broker + Celery result backend
+#    api       → FastAPI application
+#    worker    → Celery background worker
+#    flower    → Celery monitoring dashboard
+#    mcp       → MCP server (AI tool extensions)
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: aibackend_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aibackend}
+      POSTGRES_USER: ${POSTGRES_USER:-aiuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aipassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiuser}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: aibackend_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── FastAPI Application ────────────────────────────────────
+  api:
+    build: .
+    container_name: aibackend_api
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file: .env
+    volumes:
+      - .:/app          # live reload on code changes
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Celery Worker ──────────────────────────────────────────
+  worker:
+    build: .
+    container_name: aibackend_worker
+    restart: unless-stopped
+    # Different command from the api — runs Celery instead of uvicorn
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
+    env_file: .env
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Flower (Celery Monitor) ────────────────────────────────
+  flower:
+    build: .
+    container_name: aibackend_flower
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app flower --port=5555 --broker=${CELERY_BROKER_URL}
+    env_file: .env
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - worker
+
+  # ── MCP Server ────────────────────────────────────────────
+  mcp:
+    build: .
+    container_name: aibackend_mcp
+    restart: unless-stopped
+    command: python -m app.mcp.server
+    env_file: .env
+    ports:
+      - "9000:9000"
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
+    driver: local
